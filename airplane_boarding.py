@@ -1,5 +1,6 @@
 import gymnasium as gym
 from gymnasium import spaces
+import pygame
 from gymnasium.envs.registration import register
 from enum import Enum
 import numpy as np
@@ -158,15 +159,45 @@ class AirplaneRow:
         return False
     
 class AirplaneEnv(gym.Env):
-    metadata = {'render_modes': ['human', 'terminal'], 'render_fps': 1}
+    metadata = {'render_modes': ['human', 'terminal'], 'render_fps':1}
 
-    def __init__(self, render_mode=None, num_of_rows=3, seats_per_row=5):
+    def __init__(self, render_mode=None, num_of_rows=10, seats_per_row=5):
         self.seats_per_row = seats_per_row
         self.num_of_rows = num_of_rows
         self.num_of_seats = num_of_rows * seats_per_row
 
         self.render_mode = render_mode
+        self.screen = None
+        self.clock = None
+        if self.render_mode == "human":
+            pygame.init()
+            pygame.display.set_caption("Airplane Boarding Simulation")
 
+            # Define constants for drawing
+            self.SEAT_SIZE = 40
+            self.PADDING = 10
+            self.AISLE_WIDTH = 50
+            self.FONT_SIZE = 18
+            self.LEGEND_HEIGHT = 160
+
+            # Calculate screen dimensions
+            screen_width = self.AISLE_WIDTH + (self.seats_per_row * (self.SEAT_SIZE + self.PADDING))
+            screen_height = (self.num_of_rows * (self.SEAT_SIZE + self.PADDING)) + self.LEGEND_HEIGHT
+            self.screen = pygame.display.set_mode((screen_width, screen_height))
+            self.clock = pygame.time.Clock()
+            self.font = pygame.font.Font(None, self.FONT_SIZE)
+
+            # Colors
+            self.COLORS = {
+                "background": (240, 240, 240),
+                "seat_empty": (180, 180, 180),
+                "seat_occupied": (100, 100, 100),
+                "aisle": (210, 210, 210),
+                PassengerStatus.MOVING: (70, 180, 70),  # Green
+                PassengerStatus.STALLED: (220, 50, 50),  # Red
+                PassengerStatus.STOWING: (250, 150, 50),  # Orange
+                "text": (0, 0, 0),
+            }
         # Drive the Action space
         self.action_space = spaces.Discrete(self.num_of_rows)
 
@@ -235,7 +266,8 @@ class AirplaneEnv(gym.Env):
         return self._get_observation(), reward, terminated, False, {}
     
     def _calculate_reward(self):
-        reward = -self.boarding_line.num_passengers_stalled() + self.boarding_line.num_passengers_moving
+        # Correct code
+        reward = -self.boarding_line.num_passengers_stalled() + self.boarding_line.num_passengers_moving()
         return reward
     
     def is_onboarding(self):
@@ -267,6 +299,84 @@ class AirplaneEnv(gym.Env):
         
         if self.render_mode == 'terminal':
             self._render_terminal()
+        elif self.render_mode == 'human':
+            self._render_human()
+
+    def _render_human(self):
+        if self.screen is None:
+            return
+
+        # Handle window close event
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.close()
+                return
+
+        # Clear the ENTIRE screen once at the beginning
+        self.screen.fill(self.COLORS["background"])
+
+        # ... (The existing code for drawing the aisle, seats, and passengers in the aisle goes here. No changes needed in that part.)
+        aisle_x_start = self.seats_per_row // 2 * (self.SEAT_SIZE + self.PADDING)
+        pygame.draw.rect(self.screen, self.COLORS["aisle"],
+                         (aisle_x_start, 0, self.AISLE_WIDTH, self.num_of_rows * (self.SEAT_SIZE + self.PADDING)))
+        for r_idx, row in enumerate(self.airplane_rows):
+            for s_idx, seat in enumerate(row.seats):
+                seat_x = (s_idx * (self.SEAT_SIZE + self.PADDING))
+                if s_idx >= self.seats_per_row // 2:
+                    seat_x += self.AISLE_WIDTH
+                seat_y = r_idx * (self.SEAT_SIZE + self.PADDING)
+                color = self.COLORS["seat_occupied"] if seat.passenger else self.COLORS["seat_empty"]
+                pygame.draw.rect(self.screen, color, (seat_x, seat_y, self.SEAT_SIZE, self.SEAT_SIZE), border_radius=5)
+                text_surf = self.font.render(f"S{seat.seat_num:02d}", True, self.COLORS["text"])
+                text_rect = text_surf.get_rect(center=(seat_x + self.SEAT_SIZE / 2, seat_y + self.SEAT_SIZE / 2))
+                self.screen.blit(text_surf, text_rect)
+        for i, passenger in enumerate(self.boarding_line.line):
+            if passenger is not None and i < self.num_of_rows:
+                passenger_x = aisle_x_start + self.AISLE_WIDTH / 2
+                passenger_y = i * (self.SEAT_SIZE + self.PADDING) + self.SEAT_SIZE / 2
+                pygame.draw.circle(self.screen, self.COLORS[passenger.status], (passenger_x, passenger_y),
+                                   self.SEAT_SIZE / 2 - 2)
+                text_surf = self.font.render(f"P{passenger.seat_num:02d}", True, self.COLORS["text"])
+                text_rect = text_surf.get_rect(center=(passenger_x, passenger_y))
+                self.screen.blit(text_surf, text_rect)
+
+        # --- CODE TO DRAW THE LEGEND ---
+        legend_y_start = self.num_of_rows * (self.SEAT_SIZE + self.PADDING)
+        pygame.draw.line(self.screen, (150, 150, 150), (0, legend_y_start), (self.screen.get_width(), legend_y_start),
+                         2)
+
+        legend_items = [
+            (PassengerStatus.MOVING, "Passenger: Moving"),
+            (PassengerStatus.STALLED, "Passenger: Stalled"),
+            (PassengerStatus.STOWING, "Passenger: Stowing Luggage"),
+            ("seat_empty", "Seat: Empty"),
+            ("seat_occupied", "Seat: Occupied")
+        ]
+
+        start_x = self.PADDING * 2
+        item_y_offset = legend_y_start + self.PADDING * 2
+
+        for i, (key, text) in enumerate(legend_items):
+            color = self.COLORS[key]
+            # col = i % 2
+            # row = i // 2
+            # item_x = start_x + (self.screen.get_width() / 2) * col
+            current_item_y = item_y_offset + i * (self.FONT_SIZE + self.PADDING)
+            pygame.draw.rect(self.screen, color, (start_x, current_item_y, self.SEAT_SIZE, self.FONT_SIZE))
+            text_surf = self.font.render(text, True, self.COLORS["text"])
+            self.screen.blit(text_surf, (start_x + (self.SEAT_SIZE * 1.5) + self.PADDING, current_item_y))
+
+        # This updates the entire window with everything drawn in this frame
+        pygame.display.flip()
+
+        # Control the frame rate
+        self.clock.tick(self.metadata["render_fps"])
+
+    def close(self):
+        if self.screen is not None:
+            pygame.display.quit()
+            pygame.quit()
+            self.screen = None
 
     def _render_terminal(self):
         print("Seats".center(19) + " | Aisle Line")
@@ -316,7 +426,7 @@ def check_my_env():
     check_env(env.unwrapped)
 
 if __name__ == "__main__":
-    env = gym.make('airplane-boarding-v0', num_of_rows=10, seats_per_row=5, render_mode='terminal')
+    env = gym.make('airplane-boarding-v0', num_of_rows=10, seats_per_row=5, render_mode='human')
 
     observation, _= env.reset()
     terminated = False
@@ -341,5 +451,5 @@ if __name__ == "__main__":
         print(f"Step {step_count} Action: {action}")
         print(f"Observation: {observation}")
         print(f"Reward: {reward}\n")
-    
+    env.close()
     print(f"Total Reward: {total_reward}")
