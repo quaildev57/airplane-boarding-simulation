@@ -10,7 +10,7 @@ from stable_baselines3.common.callbacks import StopTrainingOnNoModelImprovement,
 
 import os
 
-model_dir = "models" #hello
+model_dir = "models" #Hello
 log_dir = "logs"
 
 def train():
