@@ -20,11 +20,14 @@ def train():
     # Increase ent_coef to encourage exploration, this resulted in a better solution.
     model = MaskablePPO('MlpPolicy', env, verbose=1, device='cuda', tensorboard_log=log_dir, ent_coef=0.1)  # device  = 'cuda' if NVIDIA GPU else 'cpu'
 
+    reward_threshold_callback = StopTrainingOnRewardThreshold(reward_threshold=50, verbose=1)
+    no_improvement_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=5, min_evals=10, verbose=1)
+    
     eval_callback = MaskableEvalCallback(
         env,
         eval_freq=10_000,
-        # callback_on_new_best = StopTrainingOnRewardThreshold(reward_threshold=???, verbose=1)
-        # callback_after_eval  = StopTrainingOnNoModelImprovement(max_no_improvement_evals=???, min_evals=???, verbose=1)
+        callback_on_new_best=reward_threshold_callback,
+        callback_after_eval=no_improvement_callback,
         verbose=1,
         best_model_save_path=os.path.join(model_dir, 'MaskablePPO'),
     )
