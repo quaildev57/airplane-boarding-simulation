@@ -63,6 +63,6 @@ def test(model_name, render=True):
 
 if __name__ == '__main__':
     train()
-    # test("best_model")
+    test("best_model")
 
 
