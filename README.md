@@ -6,7 +6,14 @@ Welcome to the **Airplane Boarding Environment**, a fully custom OpenAI Gymnasiu
 
 ## 🚀 Motivation
 
-Boarding an airplane often feels longer than it should, despite structured strategies like back-to-front or window-middle-aisle. This project creates a simulation where an RL agent can learn **optimal boarding policies** that minimize congestion and total boarding time. The main idea is to automate what airlines have tried for decades through data-driven learning and intelligent planning.
+What if boarding a plane didn’t feel like herding through chaos?
+
+Every airline has tried—from boarding by rows to loading windows first—but somehow, it still takes forever. This project flips that problem on its head. Instead of guessing, it lets an AI agent learn the smartest way to get passengers seated—by experimenting, adapting, and discovering patterns that humans might never see.
+
+Through reinforcement learning, the system runs virtual boarding simulations, measuring how small changes ripple through the crowd. Over time, it figures out how to turn that slow shuffle down the aisle into a smooth, optimized flow.
+
+It’s not just about beating the line—it’s about showing how machines can rethink everyday inefficiencies and turn data into real-world convenience.
+
 
 ---
 
